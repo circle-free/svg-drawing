@@ -7,6 +7,7 @@ import {
   createSvgChildElement,
 } from './shared/createSvgElement'
 import { download } from './shared/download'
+import { uuid } from './shared/uuidv4'
 
 const isNaN = (num: number) => num !== num
 
@@ -166,10 +167,30 @@ export class Path {
   public attrs: PathObject
   public commands: Command[]
 
-  constructor({ d, ...attrs }: PathObject = {}) {
+  constructor({ d, id, type, ...attrs }: PathObject = {}) {
     this.attrs = attrs
     this.commands = []
+    this.attrs.id = id ?? uuid()
+    this.attrs.class = type ?? 'drawnElement'
     if (d) this.parseCommandString(d)
+  }
+
+  static fromString(pathString: string): Path {
+    const path = new Path({ type: 'importedElement' })
+
+    pathString.split(' ').forEach((attr) => {
+      const [key, value] = attr.split('=')
+
+      if (['fill', 'stroke', 'stroke-width', 'id'].includes(key)) {
+        path.attrs[key] = value.substring(1, value.length - 1)
+      }
+    })
+
+    const startIndex = pathString.indexOf(' d="') + 4
+    const endIndex = startIndex + pathString.substring(startIndex).indexOf('"')
+    path.parseCommandString(pathString.substring(startIndex, endIndex))
+
+    return path
   }
 
   public scale(r: number): this {
@@ -186,6 +207,7 @@ export class Path {
     }
     return this
   }
+
   public getCommandString(): string {
     if (this.commands.length === 0) return ''
     return this.commands
@@ -248,6 +270,7 @@ export class Path {
       d: this.getCommandString(),
     }
   }
+  
   public toElement(): SVGElement {
     const attrs = Object.entries(this.attrs).reduce(
       (acc, [key, val], _i) =>
@@ -286,6 +309,7 @@ export interface SvgObject {
   background?: string
   paths: PathObject[]
 }
+
 export class Svg {
   public paths: Path[]
   public width: number
@@ -316,6 +340,12 @@ export class Svg {
     }
     return this
   }
+
+  public removePath(id: string): this {
+    this.paths = this.paths.filter(({ attrs }) => attrs.id !== id)
+    return this
+  }
+
   public clonePaths(): Path[] {
     return this.paths.map((p) => p.clone())
   }
@@ -355,8 +385,20 @@ export class Svg {
       bgEl.concat(this.paths.map((p) => p.toElement()))
     )
   }
+
   public toBase64(): string {
     return svg2base64(this.toElement().outerHTML)
+  }
+
+  public importPath(pathString: string): this {
+    const path = Path.fromString(pathString)
+
+    if (!path.attrs.id) return this
+
+    this.removePath(path.attrs.id)
+    this.addPath(path)
+
+    return this
   }
 
   public parseSVGString(svgStr: string): this {

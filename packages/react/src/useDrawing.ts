@@ -13,6 +13,10 @@ interface UseSvgDrawing {
   changeCurve: (penwidth: DrawingOption['curve']) => void
   getSvgXML: () => string | null
   download: (ext: 'svg' | 'png' | 'jpg') => void
+  insertPath: (pathString: string) => void
+  getDrawnPaths: () => any[] | undefined
+  on: () => void
+  off: () => void
 }
 export const useSvgDrawing = (
   option?: Partial<DrawingOption>
@@ -59,6 +63,22 @@ export const useSvgDrawing = (
     if (!drawingRef.current) return
     drawingRef.current.undo()
   }, [])
+  const insertPath = useCallback((pathString: string) => {
+    if (!drawingRef.current) return
+    drawingRef.current.insertPath(pathString)
+  }, [])
+  const getDrawnPaths = useCallback(() => {
+    if (!drawingRef.current) return
+    return drawingRef.current.getDrawnPaths()
+  }, [])
+  const off = useCallback(() => {
+    if (!drawingRef.current) return
+    drawingRef.current.off()
+  }, [])
+  const on = useCallback(() => {
+    if (!drawingRef.current) return
+    drawingRef.current.on()
+  }, [])
   useEffect(() => {
     if (drawingRef.current) return
     if (!renderRef.current) return
@@ -79,8 +99,12 @@ export const useSvgDrawing = (
       changeCurve,
       clear,
       undo,
+      insertPath,
+      getDrawnPaths,
       getSvgXML,
       download,
+      off,
+      on,
     },
   ]
 }

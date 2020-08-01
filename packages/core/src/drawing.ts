@@ -11,12 +11,14 @@ export interface DrawingOption extends RendererOption {
   curve?: boolean
   delay?: number
   fill?: string
+  integers?: boolean
 }
 
 export class SvgDrawing extends Renderer {
   public penColor: string
   public penWidth: number
   public fill: string
+  public integers: boolean
   public curve: boolean
   public close: boolean
   public delay: number
@@ -36,6 +38,7 @@ export class SvgDrawing extends Renderer {
       close,
       delay,
       fill,
+      integers,
       ...rendOpt
     }: DrawingOption = {}
   ) {
@@ -49,6 +52,7 @@ export class SvgDrawing extends Renderer {
     this.close = close ?? false
     this.delay = delay ?? 20
     this.fill = fill ?? 'none'
+    this.integers = integers ?? false
     this.bezier = new BezierCurve()
     this._drawPath = null
     this._listenerOption = getPassiveOptions(false)
@@ -73,7 +77,14 @@ export class SvgDrawing extends Renderer {
   }
 
   public undo(): void {
-    this.paths.pop()
+    this.paths = this.paths
+      .filter((path) => path.attrs.class === 'importedElement')
+      .concat(
+        this.paths
+          .filter(({ attrs }) => attrs.class === 'drawnElement')
+          .slice(0, -1)
+      )
+
     this.update()
   }
 
@@ -107,6 +118,21 @@ export class SvgDrawing extends Renderer {
     })
   }
 
+  public insertPath(pathString: string): void {
+    this.importPath(pathString)
+    this.update()
+  }
+
+  public getDrawnPaths(): any[] {
+    return this.paths
+      .filter(path => path.attrs.class === 'drawnElement')
+      .map(path => {
+        const clonedPath = path.clone()
+        clonedPath.attrs.class = undefined
+        return clonedPath.toElement()
+      })
+  }
+
   public drawStart(): void {
     if (this._drawPath) return
     this._drawPath = this._createDrawPath()
@@ -116,6 +142,12 @@ export class SvgDrawing extends Renderer {
   public drawMove(x: number, y: number): void {
     if (!this._drawPath) return
     const po: [number, number] = [x - this.left, y - this.top]
+
+    if (this.integers) {
+      po[0] = Math.floor(po[0]);
+      po[1] = Math.floor(po[1]);
+    }
+
     this._addDrawPoint(po)
     if (
       (this._drawPath.attrs.strokeWidth &&
